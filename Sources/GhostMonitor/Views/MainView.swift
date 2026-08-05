@@ -35,6 +35,8 @@ public struct MainView: View {
                 GhostAIView()
             case .jarvisAI:
                 JarvisDashboardView()
+            case .aiProviders:
+                AIProvidersView()
             case .settings:
                 SettingsView()
             case .cleaner:
