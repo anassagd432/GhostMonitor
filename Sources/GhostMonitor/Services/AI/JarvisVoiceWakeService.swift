@@ -11,7 +11,7 @@ public final class JarvisVoiceWakeService: ObservableObject {
         didSet {
             UserDefaults.standard.set(isVoiceWakeEnabled, forKey: "jarvis_voice_wake")
             if isVoiceWakeEnabled {
-                startListening()
+                requestPermissionsAndStart()
             } else {
                 stopListening()
             }
@@ -21,22 +21,24 @@ public final class JarvisVoiceWakeService: ObservableObject {
     @Published public private(set) var recognizedText: String = ""
     @Published public private(set) var permissionGranted: Bool = false
     
-    private let audioEngine = AVAudioEngine()
-    private var speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var audioEngine: AVAudioEngine?
+    private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     
     private init() {
-        self.isVoiceWakeEnabled = UserDefaults.standard.object(forKey: "jarvis_voice_wake") as? Bool ?? false
-        requestPermissions()
+        // Passive init to prevent startup permission crashes
+        self.isVoiceWakeEnabled = false
     }
     
-    public func requestPermissions() {
+    public func requestPermissionsAndStart() {
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor in
                 self.permissionGranted = (status == .authorized)
-                if self.permissionGranted && self.isVoiceWakeEnabled {
+                if self.permissionGranted {
                     self.startListening()
+                } else {
+                    self.isVoiceWakeEnabled = false
                 }
             }
         }
@@ -44,9 +46,16 @@ public final class JarvisVoiceWakeService: ObservableObject {
     
     public func startListening() {
         guard permissionGranted, !isListening else { return }
-        
-        // Reset previous tasks
         stopListening()
+        
+        if audioEngine == nil {
+            audioEngine = AVAudioEngine()
+        }
+        if speechRecognizer == nil {
+            speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        }
+        
+        guard let audioEngine = audioEngine else { return }
         
         let node = audioEngine.inputNode
         let recordingFormat = node.outputFormat(forBus: 0)
@@ -65,6 +74,7 @@ public final class JarvisVoiceWakeService: ObservableObject {
             isListening = true
         } catch {
             print("Failed to start audio engine: \(error)")
+            isListening = false
             return
         }
         
@@ -76,9 +86,7 @@ public final class JarvisVoiceWakeService: ObservableObject {
                 Task { @MainActor in
                     self.recognizedText = transcript
                     
-                    // Check for "jarvis" or "hey jarvis" wake word
                     if transcript.contains("jarvis") || transcript.contains("hey jarvis") {
-                        // Extract command after wake word
                         let components = transcript.components(separatedBy: "jarvis")
                         if let lastComponent = components.last, !lastComponent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             let command = lastComponent.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -98,8 +106,8 @@ public final class JarvisVoiceWakeService: ObservableObject {
     }
     
     public func stopListening() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioEngine?.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
         recognitionRequest = nil
         recognitionTask?.cancel()

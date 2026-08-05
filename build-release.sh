@@ -52,6 +52,10 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <true/>
     <key>LSUIElement</key>
     <true/>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Ghost Monitor uses Speech Recognition for JARVIS voice commands and hands-free wake word detection.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Ghost Monitor uses the microphone for hands-free JARVIS voice activation and audio controls.</string>
 </dict>
 </plist>
 EOF
