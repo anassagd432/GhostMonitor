@@ -8,6 +8,7 @@
 ![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-purple)
 ![AI Powered](https://img.shields.io/badge/AI-On--Device-green)
 ![Build](https://img.shields.io/badge/Build-Passing-brightgreen)
+[![Discord](https://img.shields.io/badge/Discord-Join_Community-7289DA?logo=discord&logoColor=white)](https://discord.gg/ghostmonitor)
 
 ---
 
