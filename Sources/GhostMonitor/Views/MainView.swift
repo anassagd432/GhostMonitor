@@ -22,6 +22,8 @@ public struct MainView: View {
                             .padding(16)
                     }
                 }
+            case .duplicateFinder:
+                DuplicateFinderView()
             case .battery:
                 ScrollView {
                     if let bat = coordinator.battery {
@@ -31,6 +33,8 @@ public struct MainView: View {
                 }
             case .ghostAI:
                 GhostAIView()
+            case .jarvisAI:
+                JarvisDashboardView()
             case .settings:
                 SettingsView()
             case .cleaner:
@@ -39,6 +43,8 @@ public struct MainView: View {
                 UninstallerView()
             case .optimizer:
                 OptimizerView()
+            case .systemMaintenance:
+                SystemMaintenanceView()
             case .gamingBooster:
                 GamingBoosterView()
             case .network:
@@ -83,6 +89,12 @@ public struct MainView: View {
                 USBGuardView()
             case .liveNetwork:
                 LiveConnectionView()
+            case .panicButton:
+                GhostPanicView()
+            case .rogueSentinel:
+                RogueSentinelView()
+            case .menuBarCollapser:
+                MenuBarCollapserView()
             case .licensing:
                 LicensingView()
             }

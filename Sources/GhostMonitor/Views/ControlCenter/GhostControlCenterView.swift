@@ -3,13 +3,14 @@ import SwiftUI
 public struct GhostControlCenterView: View {
     @State private var isExpanded = false
     @State private var isHovering = false
-    @State private var selectedTab: ControlCenterTab = .stats
+    @State private var selectedTab: ControlCenterTab = .media
     
     @ObservedObject private var mixer = VolumeMixerService.shared
     @ObservedObject private var vault = DropVaultService.shared
     @ObservedObject private var monitor = MonitoringCoordinator.shared
     
     enum ControlCenterTab: String, CaseIterable {
+        case media = "Media"
         case stats = "Stats"
         case mixer = "Mixer"
         case vault = "Vault"
@@ -17,6 +18,7 @@ public struct GhostControlCenterView: View {
         
         var icon: String {
             switch self {
+            case .media: return "play.circle.fill"
             case .stats: return "speedometer"
             case .mixer: return "slider.horizontal.3"
             case .vault: return "shippingbox.fill"
@@ -101,6 +103,9 @@ public struct GhostControlCenterView: View {
                                 .padding(.bottom, 10)
                             
                             switch selectedTab {
+                            case .media:
+                                NowPlayingWidget()
+                                    .padding(.horizontal, 20)
                             case .stats:
                                 statsView
                             case .mixer:

@@ -92,6 +92,9 @@ struct MenuBarControlCenterView: View {
                 Spacer()
             }
             
+            // Now Playing Media Controller Widget
+            NowPlayingWidget()
+            
             Divider()
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -203,6 +206,9 @@ struct MenuBarVolumeMixerView: View {
             }
         }
         .padding(.vertical, 4)
+        .onAppear {
+            mixer.refreshRunningApps()
+        }
     }
 }
 
