@@ -91,6 +91,8 @@ public struct MainView: View {
                 LiveConnectionView()
             case .pingLatency:
                 PingLatencyView()
+            case .connectors:
+                ConnectorsView()
             case .panicButton:
                 GhostPanicView()
             case .rogueSentinel:
