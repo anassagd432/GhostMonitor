@@ -89,6 +89,8 @@ public struct MainView: View {
                 USBGuardView()
             case .liveNetwork:
                 LiveConnectionView()
+            case .pingLatency:
+                PingLatencyView()
             case .panicButton:
                 GhostPanicView()
             case .rogueSentinel:
