@@ -1,254 +1,226 @@
 import SwiftUI
 
 public struct JarvisDashboardView: View {
-    @StateObject private var jarvis = JarvisService.shared
-    @State private var targetContact: String = ""
-    @State private var targetNumber: String = ""
-    @State private var callPrompt: String = ""
-    @State private var isShowingNewCallModal: Bool = false
+    @StateObject private var jarvis = OpenAIJarvisEngine.shared
+    @State private var inputPrompt: String = ""
+    @State private var showApiKeyConfig: Bool = false
     
     public init() {}
     
     public var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Top Arc Reactor / Voice Visualizer Header
-                VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            // Header Hero Banner
+            VStack(spacing: 14) {
+                HStack(spacing: 16) {
+                    // Pulsing Arc Reactor Symbol
                     ZStack {
-                        // Outer Pulsing Glow
                         Circle()
-                            .fill(GhostTheme.cyan.opacity(0.12))
-                            .frame(width: 100, height: 100)
-                            .shadow(color: GhostTheme.cyan, radius: 20)
+                            .fill(GhostTheme.cyan.opacity(0.15))
+                            .frame(width: 54, height: 54)
+                            .shadow(color: GhostTheme.cyan, radius: 12)
                         
                         Circle()
-                            .stroke(GhostTheme.gaugeGradient, lineWidth: 3)
-                            .frame(width: 80, height: 80)
+                            .stroke(GhostTheme.cyan, lineWidth: 2)
+                            .frame(width: 44, height: 44)
                         
                         Image(systemName: "cpu.fill")
-                            .font(.system(size: 36))
+                            .font(.system(size: 22))
                             .foregroundColor(GhostTheme.cyan)
-                            .shadow(color: GhostTheme.cyan, radius: 10)
                     }
                     
-                    VStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Circle().fill(jarvis.isListening ? GhostTheme.mint : Color.red).frame(width: 8, height: 8)
-                            Text("JARVIS VOICE OS • \(jarvis.isListening ? "ONLINE" : "STANDBY")")
+                            Circle().fill(GhostTheme.mint).frame(width: 8, height: 8)
+                            Text("JARVIS OPENAI AI AGENT")
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(jarvis.isListening ? GhostTheme.mint : Color.red)
+                                .foregroundColor(GhostTheme.mint)
                         }
                         
-                        Text("Listening for \"\(jarvis.wakeWord)\"")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(GhostTheme.textSecondary)
-                    }
-                    
-                    Button(action: { jarvis.toggleListening() }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: jarvis.isListening ? "mic.fill" : "mic.slash.fill")
-                            Text(jarvis.isListening ? "Mute Voice Activation" : "Enable Voice Activation")
-                        }
-                        .font(.system(size: 11, weight: .bold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(jarvis.isListening ? Color.white.opacity(0.08) : GhostTheme.cyan)
-                        .foregroundColor(jarvis.isListening ? .white : .black)
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 16)
-                
-                // Executive API & Phone Config Card
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Image(systemName: "phone.badge.plus")
-                                .foregroundColor(GhostTheme.cyan)
-                            Text("VAPI / RETELL AI AGENT PIPELINE")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(GhostTheme.cyan)
-                        }
-                        Text("Phone Line: \(jarvis.phoneNumber)")
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        Text("Real-Time Executive System Assistant")
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                     }
+                    
                     Spacer()
                     
-                    Button(action: { isShowingNewCallModal.toggle() }) {
-                        HStack {
-                            Image(systemName: "phone.fill")
-                            Text("Dispatch AI Call")
-                                .fontWeight(.bold)
+                    // API Key Config Button
+                    Button(action: { showApiKeyConfig.toggle() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "key.fill")
+                            Text(jarvis.openAIApiKey.isEmpty ? "Set OpenAI Key" : "Key Configured")
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(GhostTheme.cyberGradient)
-                        .foregroundColor(.black)
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(jarvis.openAIApiKey.isEmpty ? GhostTheme.magenta : Color.white.opacity(0.1))
+                        .foregroundColor(.white)
                         .cornerRadius(8)
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(18)
-                .cyberCardStyle(glowing: true)
                 
-                // AI Voice Phone Call Logs
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("AI VOICE CALL DELEGATION LOGS")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(GhostTheme.cyan)
-                    
-                    VStack(spacing: 10) {
-                        ForEach(jarvis.callLogs) { log in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "phone.bubble.left.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(log.status == "Completed" ? GhostTheme.mint : GhostTheme.purple)
-                                    .frame(width: 24)
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(log.contactName)
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(.white)
-                                        Text(log.phoneNumber)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(GhostTheme.textSecondary)
-                                        Spacer()
-                                        Text(log.duration)
-                                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.white.opacity(0.08))
-                                            .cornerRadius(4)
-                                    }
-                                    
-                                    Text(log.transcriptSummary)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(GhostTheme.textSecondary)
-                                }
-                            }
-                            .padding(12)
-                            .background(Color.white.opacity(0.04))
-                            .cornerRadius(10)
-                        }
-                    }
-                }
-                .padding(20)
-                .cyberCardStyle()
-                
-                // AI Email Dispatcher Tasks
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("PENDING EMAIL DISPATCHES")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(GhostTheme.cyan)
-                    
-                    VStack(spacing: 10) {
-                        ForEach(jarvis.pendingEmailTasks) { task in
-                            HStack(spacing: 12) {
-                                Image(systemName: "envelope.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(GhostTheme.cyan)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(task.subject)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.white)
-                                    Text("To: \(task.recipient) • \(task.summary)")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(GhostTheme.textSecondary)
-                                        .lineLimit(1)
-                                }
-                                
-                                Spacer()
-                                
-                                Button(action: { jarvis.dispatchEmail(id: task.id) }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "paperplane.fill")
-                                        Text("Send")
-                                    }
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.black)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(GhostTheme.cyan)
-                                    .cornerRadius(6)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(12)
-                            .background(Color.white.opacity(0.04))
-                            .cornerRadius(10)
-                        }
-                    }
-                }
-                .padding(20)
-                .cyberCardStyle()
-                
-                // API Keys Config Card
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("BUSINESS INTEGRATION API KEYS (VAPI.AI & RETELL AI)")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(GhostTheme.textSecondary)
-                    
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Vapi.ai API Key")
-                                .font(.system(size: 10))
-                                .foregroundColor(GhostTheme.textSecondary)
-                            SecureField("vapi_key_...", text: $jarvis.vapiApiKey)
+                // API Key Settings Bar (Collapsible)
+                if showApiKeyConfig || jarvis.openAIApiKey.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ENTER YOUR OPENAI API KEY (GPT-4o / GPT-4o-mini)")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(GhostTheme.cyan)
+                        
+                        HStack(spacing: 10) {
+                            SecureField("sk-proj-...", text: $jarvis.openAIApiKey)
                                 .textFieldStyle(.plain)
                                 .padding(8)
                                 .background(Color.black.opacity(0.4))
                                 .cornerRadius(6)
+                                .foregroundColor(.white)
+                            
+                            Picker("", selection: $jarvis.selectedModel) {
+                                Text("gpt-4o-mini").tag("gpt-4o-mini")
+                                Text("gpt-4o").tag("gpt-4o")
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 130)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(8)
+                }
+                
+                // Quick Action Chips Row
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        quickChip(icon: "bolt.fill", title: "Trigger Panic Lock", action: "Trigger Emergency Panic Lock")
+                        quickChip(icon: "wrench.and.screwdriver.fill", title: "Run System Tuneup", action: "Run Full System Tuneup")
+                        quickChip(icon: "cup.and.saucer.fill", title: "Toggle Anti-Sleep", action: "Toggle Anti-Sleep Insomnia Mode")
+                        quickChip(icon: "mic.slash.fill", title: "Toggle Mic Block", action: "Toggle Mic Block Driver")
+                    }
+                }
+            }
+            .padding(20)
+            .background(Color.black.opacity(0.3))
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            // Chat Conversation History
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(jarvis.messages) { msg in
+                            HStack(alignment: .top, spacing: 10) {
+                                if msg.sender == "JARVIS" {
+                                    Image(systemName: "cpu.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(GhostTheme.cyan)
+                                        .padding(8)
+                                        .background(GhostTheme.cyan.opacity(0.12))
+                                        .clipShape(Circle())
+                                } else {
+                                    Spacer()
+                                }
+                                
+                                VStack(alignment: msg.sender == "JARVIS" ? .leading : .trailing, spacing: 4) {
+                                    Text(msg.sender.uppercased())
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(msg.sender == "JARVIS" ? GhostTheme.cyan : GhostTheme.purple)
+                                    
+                                    Text(msg.text)
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white)
+                                        .padding(12)
+                                        .background(msg.sender == "JARVIS" ? Color.white.opacity(0.06) : GhostTheme.purple.opacity(0.3))
+                                        .cornerRadius(12)
+                                }
+                                .frame(maxWidth: 420, alignment: msg.sender == "JARVIS" ? .leading : .trailing)
+                                
+                                if msg.sender != "JARVIS" {
+                                    Image(systemName: "person.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(GhostTheme.purple)
+                                } else {
+                                    Spacer()
+                                }
+                            }
+                            .id(msg.id)
                         }
                         
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Retell AI API Key")
-                                .font(.system(size: 10))
-                                .foregroundColor(GhostTheme.textSecondary)
-                            SecureField("retell_key_...", text: $jarvis.retellApiKey)
-                                .textFieldStyle(.plain)
-                                .padding(8)
-                                .background(Color.black.opacity(0.4))
-                                .cornerRadius(6)
+                        if jarvis.isProcessing {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text("JARVIS is thinking...")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(GhostTheme.textSecondary)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 10)
                         }
                     }
+                    .padding(20)
                 }
-                .padding(20)
-                .cyberCardStyle()
+                .onChange(of: jarvis.messages.count) { _ in
+                    if let last = jarvis.messages.last {
+                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    }
+                }
             }
-            .padding(24)
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            // Bottom Prompt Input Bar
+            HStack(spacing: 10) {
+                TextField("Ask JARVIS or give a system command...", text: $inputPrompt)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(10)
+                    .foregroundColor(.white)
+                    .onSubmit {
+                        submitPrompt()
+                    }
+                
+                Button(action: { submitPrompt() }) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(12)
+                        .background(GhostTheme.cyan)
+                        .cornerRadius(10)
+                        .shadow(color: GhostTheme.cyan.opacity(0.5), radius: 6)
+                }
+                .buttonStyle(.plain)
+                .disabled(inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(16)
+            .background(Color.black.opacity(0.4))
         }
         .background(GhostTheme.bgDark)
-        .sheet(isPresented: $isShowingNewCallModal) {
-            VStack(spacing: 16) {
-                Text("Dispatch AI Voice Call")
-                    .font(.headline)
-                
-                TextField("Contact Name (e.g. John Doe)", text: $targetContact)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Phone Number (e.g. +1 415 555 0199)", text: $targetNumber)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Call Instructions / Prompt for AI", text: $callPrompt)
-                    .textFieldStyle(.roundedBorder)
-                
-                HStack {
-                    Button("Cancel") { isShowingNewCallModal = false }
-                    Spacer()
-                    Button("Start AI Call") {
-                        jarvis.triggerCall(to: targetContact, number: targetNumber, prompt: callPrompt)
-                        isShowingNewCallModal = false
-                        targetContact = ""
-                        targetNumber = ""
-                        callPrompt = ""
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
+    }
+    
+    private func submitPrompt() {
+        let trimmed = inputPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        inputPrompt = ""
+        jarvis.sendMessage(trimmed)
+    }
+    
+    private func quickChip(icon: String, title: String, action: String) -> some View {
+        Button(action: { jarvis.sendMessage(action) }) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
             }
-            .padding(24)
-            .frame(width: 380)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.06))
+            .foregroundColor(GhostTheme.cyan)
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(GhostTheme.cyan.opacity(0.2), lineWidth: 1)
+            )
         }
+        .buttonStyle(.plain)
     }
 }
