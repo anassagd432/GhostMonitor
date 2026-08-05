@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct JarvisDashboardView: View {
     @StateObject private var jarvis = OpenAIJarvisEngine.shared
+    @StateObject private var voiceWake = JarvisVoiceWakeService.shared
     @State private var inputPrompt: String = ""
     @State private var showApiKeyConfig: Bool = false
     
@@ -15,33 +16,38 @@ public struct JarvisDashboardView: View {
                     // Pulsing Arc Reactor Symbol
                     ZStack {
                         Circle()
-                            .fill(GhostTheme.cyan.opacity(0.15))
+                            .fill(voiceWake.isListening ? GhostTheme.mint.opacity(0.15) : GhostTheme.cyan.opacity(0.15))
                             .frame(width: 54, height: 54)
-                            .shadow(color: GhostTheme.cyan, radius: 12)
+                            .shadow(color: voiceWake.isListening ? GhostTheme.mint : GhostTheme.cyan, radius: 12)
                         
                         Circle()
-                            .stroke(GhostTheme.cyan, lineWidth: 2)
+                            .stroke(voiceWake.isListening ? GhostTheme.mint : GhostTheme.cyan, lineWidth: 2)
                             .frame(width: 44, height: 44)
                         
                         Image(systemName: "cpu.fill")
                             .font(.system(size: 22))
-                            .foregroundColor(GhostTheme.cyan)
+                            .foregroundColor(voiceWake.isListening ? GhostTheme.mint : GhostTheme.cyan)
                     }
                     
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
-                            Circle().fill(GhostTheme.mint).frame(width: 8, height: 8)
-                            Text("JARVIS OPENAI AI AGENT")
+                            Circle().fill(voiceWake.isListening ? GhostTheme.mint : GhostTheme.cyan).frame(width: 8, height: 8)
+                            Text("JARVIS OPENAI AI AGENT • \(voiceWake.isListening ? "VOICE WAKE ACTIVE" : "READY")")
                                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(GhostTheme.mint)
+                                .foregroundColor(voiceWake.isListening ? GhostTheme.mint : GhostTheme.cyan)
                         }
                         
-                        Text("Real-Time Executive System Assistant")
+                        Text(voiceWake.isListening ? "Say \"Hey Jarvis [command]\"" : "Real-Time Executive System Assistant")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                     }
                     
                     Spacer()
+                    
+                    // Hands-Free Voice Wake Toggle
+                    Toggle("Hands-Free 'Hey Jarvis'", isOn: $voiceWake.isVoiceWakeEnabled)
+                        .toggleStyle(CyberToggleStyle())
+                        .frame(width: 170)
                     
                     // API Key Config Button
                     Button(action: { showApiKeyConfig.toggle() }) {
