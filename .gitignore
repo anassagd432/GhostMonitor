@@ -6,3 +6,14 @@ build/
 *.xcodeproj
 xcuserdata/
 DerivedData/
+
+# Local Docs & Internal Files (Ignored on GitHub)
+.ultraplan/
+FEATURES.md
+LIMITATIONS.md
+PRIVACY.md
+ROADMAP.md
+display_test.swift
+extract_frames.swift
+open-app.sh
+build-dmg.sh
