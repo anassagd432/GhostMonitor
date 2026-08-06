@@ -3,6 +3,12 @@ import AppKit
 import ApplicationServices
 import Combine
 
+// MARK: - Swift 6 AX Bridge
+// AXIsProcessTrustedWithOptions is a legacy C API whose read of the mutable global
+// kAXTrustedCheckOptionPrompt triggers a Swift 6 concurrency-safety diagnostic when
+// evaluated inline on the MainActor. Nonisolated helpers keep the AX call in default
+// isolation and side-step the erroneous diagnostic without suppressing real races.
+
 @MainActor
 public class SnapMasterService: ObservableObject {
     public static let shared = SnapMasterService()
@@ -15,26 +21,33 @@ public class SnapMasterService: ObservableObject {
         case topLeft, topRight, bottomLeft, bottomRight
     }
     
+    /// Nonisolated AX bridge. Uses the literal string key instead of reading macOS's
+    /// `kAXTrustedCheckOptionPrompt` global (declared `var` in AXUIElementC.h, triggers
+    /// Swift 6's shared-mutable-state diagnostic on the MainActor).
+    private nonisolated static func resolveAccessibilityPermission(prompt: Bool = false) -> Bool {
+        let options = ["AXTrustedCheckOptionPrompt" as CFString: prompt] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+    
     private init() {
         checkPermission()
     }
     
     public func checkPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        hasAccessibilityPermission = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        hasAccessibilityPermission = Self.resolveAccessibilityPermission()
     }
     
     public func promptForPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
+        _ = Self.resolveAccessibilityPermission(prompt: true)
         
-        // Polling to detect when user grants it
-        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            if AXIsProcessTrusted() {
-                DispatchQueue.main.async {
+        // Poll via cancellable task instead of a runloop Timer
+        Task { @MainActor [weak self] in
+            while let self = self, !Task.isCancelled {
+                if AXIsProcessTrusted() {
                     self.hasAccessibilityPermission = true
+                    return
                 }
-                timer.invalidate()
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }

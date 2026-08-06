@@ -115,5 +115,6 @@ public struct OptimizerView: View {
 }
 
 extension StartupItem.ItemType: CaseIterable {
-    public static var allCases: [StartupItem.ItemType] = [.userAgent, .systemAgent, .systemDaemon]
+    // CaseIterable requires a static var allCases, but immutably backed to satisfy Swift 6 concurrency.
+    public static let allCases: [StartupItem.ItemType] = [.userAgent, .systemAgent, .systemDaemon]
 }

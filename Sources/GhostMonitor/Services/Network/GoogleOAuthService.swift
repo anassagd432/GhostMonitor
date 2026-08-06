@@ -65,17 +65,19 @@ public final class GoogleOAuthService: NSObject, ObservableObject, ASWebAuthenti
         session.start()
     }
     
+    private nonisolated static let tokenURL = URL(string: "https://oauth2.googleapis.com/token")!
+    private nonisolated static let redirectURI = "ghostmonitor://oauth-callback"
+    
     private func exchangeCodeForTokens(code: String) {
         guard let verifier = codeVerifier else { return }
         let clientID = googleClientId.isEmpty ? "YOUR_DESKTOP_CLIENT_ID.apps.googleusercontent.com" : googleClientId
         
-        Task.detached(priority: .userInitiated) {
-            let url = URL(string: "https://oauth2.googleapis.com/token")!
-            var req = URLRequest(url: url)
+        Task { @MainActor in
+            var req = URLRequest(url: Self.tokenURL)
             req.httpMethod = "POST"
             req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             
-            let body = "code=\(code)&client_id=\(clientID)&redirect_uri=ghostmonitor://oauth-callback&grant_type=authorization_code&code_verifier=\(verifier)"
+            let body = "code=\(code)&client_id=\(clientID)&redirect_uri=\(Self.redirectURI)&grant_type=authorization_code&code_verifier=\(verifier)"
             req.httpBody = body.data(using: .utf8)
             
             do {
@@ -86,14 +88,12 @@ public final class GoogleOAuthService: NSObject, ObservableObject, ASWebAuthenti
                     
                     let refToken = json["refresh_token"] as? String
                     
-                    await MainActor.run {
-                        self.accessToken = accToken
-                        self.refreshToken = refToken
-                        self.isGmailConnected = true
-                        self.isCalendarConnected = true
-                        self.saveTokensToKeychain(accToken: accToken, refToken: refToken)
-                        self.fetchUserInfo()
-                    }
+                    self.accessToken = accToken
+                    self.refreshToken = refToken
+                    self.isGmailConnected = true
+                    self.isCalendarConnected = true
+                    self.saveTokensToKeychain(accToken: accToken, refToken: refToken)
+                    self.fetchUserInfo()
                 }
             } catch {
                 print("Failed token exchange: \(error)")
@@ -103,7 +103,7 @@ public final class GoogleOAuthService: NSObject, ObservableObject, ASWebAuthenti
     
     public func fetchUserInfo() {
         guard let token = accessToken else { return }
-        Task.detached(priority: .userInitiated) {
+        Task { @MainActor in
             let url = URL(string: "https://www.googleapis.com/oauth2/v2/userinfo")!
             var req = URLRequest(url: url)
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -111,9 +111,7 @@ public final class GoogleOAuthService: NSObject, ObservableObject, ASWebAuthenti
             if let (data, _) = try? await URLSession.shared.data(for: req),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let email = json["email"] as? String {
-                await MainActor.run {
-                    self.connectedUserEmail = email
-                }
+                self.connectedUserEmail = email
             }
         }
     }

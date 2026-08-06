@@ -50,13 +50,9 @@ public final class NTFSService: ObservableObject {
     public func installDrivers() async {
         isInstallingDriver = true
         
-        // This command runs brew to install macfuse and ntfs-3g-mac
-        // Note: brew shouldn't normally be run as root, so we run it as the current user.
-        // However, installing casks like macfuse may prompt for password in the terminal.
-        // Since we are invoking it via Process, we'll try standard brew install.
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "eval $(/opt/homebrew/bin/brew shellenv); brew install gromgit/fuse/ntfs-3g-mac macfuse"]
+        process.arguments = ["-c", "eval $(/opt/homebrew/bin/brew shellenv); NONINTERACTIVE=1 brew install --cask macfuse gromgit/fuse/ntfs-3g-mac"]
         
         do {
             try process.run()
@@ -106,27 +102,43 @@ public final class NTFSService: ObservableObject {
         }
         
         for disk in allDisksAndPartitions {
+            // Check disk partitions
+            var candidates: [[String: Any]] = []
             if let partitions = disk["Partitions"] as? [[String: Any]] {
-                for part in partitions {
-                    if let type = part["Content"] as? String, type == "Windows_NTFS" || type == "NTFS",
-                       let devId = part["DeviceIdentifier"] as? String {
-                        
-                        let volName = (part["VolumeName"] as? String) ?? "Untitled"
-                        let size = (part["Size"] as? Int64) ?? 0
-                        
-                        // Check if it's currently mounted natively (which implies Read-Only for NTFS)
-                        // Or if it's mounted via macfuse (Read-Write)
-                        // A quick heuristic: if it's mounted, we check mount output
-                        let isRW = isMountedReadWrite(device: devId)
-                        
-                        let drive = NTFSDrive(
-                            id: devId,
-                            name: volName,
-                            sizeBytes: size,
-                            deviceIdentifier: devId,
-                            isMountedRW: isRW,
-                            volumeName: volName
-                        )
+                candidates.append(contentsOf: partitions)
+            }
+            // Also check whole disk
+            candidates.append(disk)
+            
+            for part in candidates {
+                guard let devId = part["DeviceIdentifier"] as? String else { continue }
+                
+                let contentType = (part["Content"] as? String) ?? ""
+                let volName = (part["VolumeName"] as? String) ?? "Untitled"
+                let size = (part["Size"] as? Int64) ?? 0
+                
+                let isNTFSContent = contentType == "Windows_NTFS" ||
+                                    contentType == "NTFS" ||
+                                    contentType == "Microsoft Basic Data" ||
+                                    contentType == "Basic Data" ||
+                                    contentType == "EBD0A0A2-B9E5-4433-87C0-68B6B72699C7" ||
+                                    contentType == "0x07"
+                
+                // Deep inspection via diskutil info
+                let fsType = checkFilesystemType(deviceIdentifier: devId)
+                let isNTFS = isNTFSContent || fsType.contains("ntfs")
+                
+                if isNTFS {
+                    let isRW = isMountedReadWrite(device: devId)
+                    let drive = NTFSDrive(
+                        id: devId,
+                        name: volName.isEmpty ? "NTFS Drive (\(devId))" : volName,
+                        sizeBytes: size,
+                        deviceIdentifier: devId,
+                        isMountedRW: isRW,
+                        volumeName: volName.isEmpty ? "NTFS_Drive" : volName
+                    )
+                    if !foundDrives.contains(where: { $0.deviceIdentifier == devId }) {
                         foundDrives.append(drive)
                     }
                 }
@@ -134,6 +146,25 @@ public final class NTFSService: ObservableObject {
         }
         
         return foundDrives
+    }
+    
+    private nonisolated static func checkFilesystemType(deviceIdentifier: String) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+        process.arguments = ["info", "-plist", deviceIdentifier]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] {
+                let fsType = (plist["FilesystemType"] as? String) ?? (plist["FilesystemName"] as? String) ?? ""
+                return fsType.lowercased()
+            }
+        } catch {}
+        return ""
     }
     
     private nonisolated static func isMountedReadWrite(device: String) -> Bool {
@@ -147,13 +178,11 @@ public final class NTFSService: ObservableObject {
             process.waitUntilExit()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let output = String(data: data, encoding: .utf8) {
-                // Look for "/dev/diskXsY on /Volumes/Name (macfuse" or something indicating rw
-                // Or simply check if ntfs-3g / macfuse is in the mount line for this device
                 let lines = output.components(separatedBy: .newlines)
                 for line in lines {
                     if line.contains("/dev/\(device)") {
-                        if line.contains("macfuse") || line.contains("ntfs-3g") {
-                            return true // It's mounted by our 3rd party driver!
+                        if line.contains("macfuse") || line.contains("ntfs-3g") || (line.contains("read-write") || line.contains("rw,")) {
+                            return true
                         }
                     }
                 }
@@ -164,21 +193,27 @@ public final class NTFSService: ObservableObject {
     
     public func mountReadWrite(drive: NTFSDrive) async {
         let ntfsBinary = FileManager.default.fileExists(atPath: "/opt/homebrew/bin/ntfs-3g") ? "/opt/homebrew/bin/ntfs-3g" : "/usr/local/bin/ntfs-3g"
+        let hasNTFS3G = FileManager.default.fileExists(atPath: ntfsBinary)
         let volName = drive.volumeName.isEmpty ? "NTFS_Drive" : drive.volumeName
         
-        // 1. Unmount the Apple Read-Only mount
+        // 1. Unmount existing read-only mount
         let unmountProc = Process()
         unmountProc.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
         unmountProc.arguments = ["unmount", drive.deviceIdentifier]
         try? unmountProc.run()
         unmountProc.waitUntilExit()
         
-        // 2. Create the mount directory and run ntfs-3g via root
-        let mountCommand = "mkdir -p /Volumes/\(volName) && \(ntfsBinary) /dev/\(drive.deviceIdentifier) /Volumes/\(volName) -o local,allow_other,auto_xattr,volname=\(volName)"
+        // 2. Mount command (use ntfs-3g if installed, or native mount_ntfs fallback)
+        let mountCommand: String
+        if hasNTFS3G {
+            mountCommand = "mkdir -p /Volumes/\(volName) && \(ntfsBinary) /dev/\(drive.deviceIdentifier) /Volumes/\(volName) -o local,allow_other,auto_xattr,volname=\(volName)"
+        } else {
+            mountCommand = "mkdir -p /Volumes/\(volName) && mount_ntfs -o rw /dev/\(drive.deviceIdentifier) /Volumes/\(volName) || mount -t ntfs -o rw /dev/\(drive.deviceIdentifier) /Volumes/\(volName)"
+        }
         
         do {
             try await PrivilegeService.shared.executeAsRoot(mountCommand)
-            scanDrives() // refresh
+            scanDrives()
         } catch {
             print("Failed to mount NTFS drive RW: \(error)")
         }

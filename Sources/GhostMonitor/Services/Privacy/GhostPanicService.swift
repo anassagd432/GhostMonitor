@@ -91,13 +91,17 @@ public final class GhostPanicService: ObservableObject {
         }
     }
     
+    private nonisolated static func executeShell(_ command: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", command]
+        try? process.run()
+        process.waitUntilExit()
+    }
+    
     private func runShellCommand(_ command: String) {
-        Task.detached(priority: .userInitiated) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/sh")
-            process.arguments = ["-c", command]
-            try? process.run()
-            process.waitUntilExit()
+        Task.detached(priority: .userInitiated) { [command] in
+            Self.executeShell(command)
         }
     }
 }

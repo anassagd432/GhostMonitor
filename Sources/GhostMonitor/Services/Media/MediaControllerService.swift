@@ -27,18 +27,28 @@ public class MediaControllerService: ObservableObject {
     @Published public private(set) var activeTrack: MediaTrackInfo? = nil
     @Published public private(set) var isPlaying: Bool = false
     
-    private var updateTimer: Timer?
+    private var pollingTask: Task<Void, Never>?
     
     private init() {
         startPolling()
     }
     
+    /// Cancellable task-based polling. Survives modal eventTracking runloops, biased to
+    /// `.utility` so it never fights UI frames, and early-exits when Spotify/Music are absent.
     public func startPolling() {
-        fetchNowPlaying()
-        updateTimer?.invalidate()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.fetchNowPlaying()
+        pollingTask?.cancel()
+        pollingTask = Task { @MainActor [weak self] in
+            while let self = self, !Task.isCancelled {
+                defer {}
+                self.fetchNowPlaying()
+                
+                // Detect whether any supported app is running before sleeping.
+                let spotifyRunning = NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.spotify.client" }
+                let musicRunning = NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.apple.music" }
+                
+                // When nothing to display, back off to 10s poll instead of 2s active cadence.
+                let intervalSeconds: Double = (spotifyRunning || musicRunning) ? 2.0 : 10.0
+                try? await Task.sleep(for: .seconds(intervalSeconds))
             }
         }
     }

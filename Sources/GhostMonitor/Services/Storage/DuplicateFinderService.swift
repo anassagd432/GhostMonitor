@@ -48,11 +48,15 @@ public final class DuplicateFinderService: ObservableObject {
             for dir in scanDirs {
                 guard let enumerator = fm.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { continue }
                 
-                for case let fileURL as URL in enumerator {
-                    if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-                       values.isRegularFile == true,
-                       let size = values.fileSize, size > 100_000 { // Only scan files > 100KB
-                        sizeMap[Int64(size), default: []].append(fileURL)
+                // Manual iteration to stay compatible with async contexts (Swift 6)
+                if let itr = enumerator as FileManager.DirectoryEnumerator? {
+                    itr.skipDescendants()
+                    while let fileURL = itr.nextObject() as? URL {
+                        if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+                           values.isRegularFile == true,
+                           let size = values.fileSize, size > 100_000 { // Only scan files > 100KB
+                            sizeMap[Int64(size), default: []].append(fileURL)
+                        }
                     }
                 }
             }

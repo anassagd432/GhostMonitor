@@ -27,18 +27,21 @@ public final class PingLatencyService: ObservableObject {
     @Published public private(set) var averagePingMs: Double = 18.0
     @Published public private(set) var pingHistory: [Double] = [18.0, 16.5, 21.0, 17.8, 19.2, 15.4, 18.0]
     
-    private var timer: Timer?
+    private var pollingTask: Task<Void, Never>?
     
     private init() {
         startPinging()
     }
     
+    /// Cancellable task-based ping loop. Replaces runloop-bound Timer.scheduledTimer,
+    /// which would stall when any modal panel took .eventTracking, and fires the pings
+    /// concurrently (3 hosts at once) instead of serially via a for-loop.
     public func startPinging() {
-        runPingCheck()
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.runPingCheck()
+        pollingTask?.cancel()
+        pollingTask = Task { @MainActor [weak self] in
+            while let self = self, !Task.isCancelled {
+                self.runPingCheck()
+                try? await Task.sleep(for: .seconds(3))
             }
         }
     }
