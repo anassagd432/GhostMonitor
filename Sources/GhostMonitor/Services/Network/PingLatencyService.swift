@@ -63,12 +63,13 @@ public final class PingLatencyService: ObservableObject {
                 results.append(PingResult(serverName: name, host: host, latencyMs: ms, status: status))
             }
             
-            let avg = results.isEmpty ? 0 : totalMs / Double(results.count)
+            let finalResults = results
+            let finalAvg = results.isEmpty ? 0 : totalMs / Double(results.count)
             
             await MainActor.run {
-                self.pingResults = results
-                self.averagePingMs = avg
-                self.pingHistory.append(avg)
+                self.pingResults = finalResults
+                self.averagePingMs = finalAvg
+                self.pingHistory.append(finalAvg)
                 if self.pingHistory.count > 20 {
                     self.pingHistory.removeFirst()
                 }

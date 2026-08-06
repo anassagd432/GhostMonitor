@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-public enum AIProvider: String, CaseIterable, Identifiable, Codable {
+public enum AIProvider: String, CaseIterable, Identifiable, Codable, Sendable {
     case openAI = "OpenAI (GPT-4o / Codex)"
     case anthropic = "Anthropic (Claude 3.5 Sonnet)"
     case googleGemini = "Google Gemini (2.0 Flash)"
